@@ -12,6 +12,7 @@ from .game import ChessGame
 from .leaderboard import LeaderboardManager
 from .llm_agent import LLMChessAgent
 from .session import SessionManager
+from . import __version__
 
 import urllib.request
 import json
@@ -109,44 +110,64 @@ def play_tournament_match(
         if not legal_sans:
             break
 
-        # Deliberate
-        decision = current_agent.deliberate_move(game)
-        move_candidate = decision.get("move")
-
-        # Fallback if LLM suggests an illegal move: pick best engine advice or first legal move
-        if not move_candidate or move_candidate not in legal_sans:
-            advice = game.get_engine_advice(time_limit_secs=0.04)
-            if advice.get("best_move"):
-                move_candidate = game.board.san(game.board.parse_uci(advice["best_move"]))
-            else:
-                move_candidate = legal_sans[0]
-
         if current_agent.with_mcp:
-            # ── PASSAGEM OBRIGATÓRIA PELO GATE DO MCP (SEM FALLBACK) ──
-            # O agente TEM que prover Gherkin válido ou declarar reuse/divergence.
-            # Não existe fallback canônico sintético!
-            reuse_sc = decision.get("reuse_scenario_name")
-            gherkin_text = decision.get("gherkin")
-            diverges_from = decision.get("diverges_from")
-            divergence_reason = decision.get("divergence_reason")
+            # ── PASSAGEM OBRIGATÓRIA PELO GATE DO MCP (COM FEEDBACK DE ERRO AO AGENTE) ──
+            # Se o Gherkin for rejeitado pelo gate, o agente RECEBE O ERRO e tem até 3 chances para corrigir!
+            move_executed = False
+            last_error_msg = None
+            max_gate_attempts = 3
 
-            try:
-                res = game.execute_move(
-                    move_str=move_candidate,
-                    gherkin_text=gherkin_text,
-                    reuse_scenario_name=reuse_sc,
-                    diverges_from=diverges_from,
-                    divergence_reason=divergence_reason,
-                    enforce_non_silent_substitution=True,
-                )
-                mcp_events.append(res)
-            except Exception as gate_err:
-                # VIOLAÇÃO DO GATE EPISTÊMICO: Derrota por desqualificação imediata
+            for attempt in range(max_gate_attempts):
+                # Se for retry, passa a mensagem de erro anterior para o agente corrigir sua resposta
+                if attempt == 0:
+                    decision = current_agent.deliberate_move(game)
+                else:
+                    decision = current_agent.deliberate_move(game, error_feedback=last_error_msg)
+
+                move_candidate = decision.get("move")
+                if not move_candidate or move_candidate not in legal_sans:
+                    advice = game.get_engine_advice(time_limit_secs=0.04)
+                    if advice.get("best_move"):
+                        move_candidate = game.board.san(game.board.parse_uci(advice["best_move"]))
+                    else:
+                        move_candidate = legal_sans[0]
+
+                reuse_sc = decision.get("reuse_scenario_name")
+                gherkin_text = decision.get("gherkin")
+                diverges_from = decision.get("diverges_from")
+                divergence_reason = decision.get("divergence_reason")
+
+                try:
+                    res = game.execute_move(
+                        move_str=move_candidate,
+                        gherkin_text=gherkin_text,
+                        reuse_scenario_name=reuse_sc,
+                        diverges_from=diverges_from,
+                        divergence_reason=divergence_reason,
+                        enforce_non_silent_substitution=True,
+                    )
+                    mcp_events.append(res)
+                    move_executed = True
+                    break
+                except Exception as gate_err:
+                    last_error_msg = str(gate_err)
+
+            if not move_executed:
+                # O agente falhou após receber o erro e tentar corrigir 3 vezes
                 outcome = "black" if (game.board.turn == chess.WHITE) else "white"
-                result_desc = f"Desqualificação ({current_agent.name} violou o Gate Gherkin: {gate_err})"
+                result_desc = f"Desqualificação ({current_agent.name} não corrigiu o erro do Gate Gherkin após 3 tentativas: {last_error_msg})"
                 break
         else:
             # ── AGENTE VIA MCP SEM GATE GHERKIN (MCP play_direct_move) ──
+            decision = current_agent.deliberate_move(game)
+            move_candidate = decision.get("move")
+            if not move_candidate or move_candidate not in legal_sans:
+                advice = game.get_engine_advice(time_limit_secs=0.04)
+                if advice.get("best_move"):
+                    move_candidate = game.board.san(game.board.parse_uci(advice["best_move"]))
+                else:
+                    move_candidate = legal_sans[0]
+
             res = game.execute_direct_move(move_candidate)
             mcp_events.append(res)
 
@@ -190,7 +211,7 @@ def play_tournament_match(
                 outcome = "draw"
                 result_desc = f"Empate Posicional ({cp/100:.1f})"
 
-    # Update OpenSkill Leaderboard
+    # Update OpenSkill Leaderboard with version tracking
     leaderboard.record_match(
         player_white=agent_white.name,
         player_black=agent_black.name,
@@ -199,11 +220,16 @@ def play_tournament_match(
         outcome=outcome,
         game_id=game_id,
         plies=plies_played,
-        details={"result_desc": result_desc, "duration_s": round(duration, 1)},
+        details={
+            "result_desc": result_desc,
+            "duration_s": round(duration, 1),
+            "app_version": __version__,
+        },
     )
 
     return {
         "game_id": game_id,
+        "app_version": __version__,
         "white": agent_white.name,
         "black": agent_black.name,
         "outcome": outcome,

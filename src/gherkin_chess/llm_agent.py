@@ -31,10 +31,11 @@ class LLMChessAgent:
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         self.api_base = api_base or os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
 
-    def deliberate_move(self, game: ChessGame) -> Dict[str, Any]:
+    def deliberate_move(self, game: ChessGame, error_feedback: Optional[str] = None) -> Dict[str, Any]:
         """
         Query the LLM to choose a legal move.
         If with_mcp=True, prompt includes retrieved OKF scenarios and demands Gherkin.
+        If error_feedback is provided, injects it into the prompt so the agent corrects its Gherkin.
         """
         board = game.board
         legal_moves_san = [board.san(m) for m in board.legal_moves]
@@ -75,10 +76,17 @@ Choose your move. Respond ONLY in valid JSON with format:
                     memory_context += f"{i}. Scenario: '{item['scenario_name']}' (Score: {item['score']})\n"
                     memory_context += f"   Gherkin:\n{item['gherkin']}\n\n"
 
+            feedback_section = ""
+            if error_feedback:
+                feedback_section = f"""\n⚠️ YOUR PREVIOUS SUBMISSION WAS REJECTED BY THE GHERKIN-CHESS MCP GATE:
+Error: {error_feedback}
+YOU MUST FIX THIS ERROR IMMEDIATELY AND SEND A VALID GHERKIN SPECIFICATION!
+"""
+
             prompt = f"""You are an intelligent chess agent playing as {color} operating under the strict Gherkin-Chess MCP protocol.
 Current FEN: {curr_fen}
 Legal moves: {', '.join(legal_moves_san)}
-
+{feedback_section}
 {memory_context}
 MANDATORY PROTOCOL RULES:
 1. REUSE: If a Scenario from memory matches your plan, set "reuse_scenario_name": "<scenario_name>" and "gherkin": null.

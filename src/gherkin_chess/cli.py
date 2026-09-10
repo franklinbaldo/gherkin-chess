@@ -134,9 +134,10 @@ def print_round_summary(
     leaderboard: LeaderboardManager,
 ):
     """Render comprehensive stats report of the completed tournament round."""
+    from . import __version__
     console.print("\n")
     console.print(Panel(
-        f"[bold bright_green]✔ RODADA FINALIZADA COM SUCESSO![/bold bright_green]\n"
+        f"[bold bright_green]✔ RODADA FINALIZADA COM SUCESSO![/bold bright_green] (Versão do App: [bold green]v{__version__}[/bold green])\n"
         f"Partidas disputadas: [bold cyan]{len(round_results)}[/bold cyan] | "
         f"Tempo total de jogo: [bold yellow]{sum(r.get('duration_s', 0) for r in round_results):.1f}s[/bold yellow] | "
         f"Lances totais: [bold magenta]{sum(r.get('plies', 0) for r in round_results)}[/bold magenta]",
@@ -146,11 +147,12 @@ def print_round_summary(
 
     # 1. Tabela de Confrontos da Rodada
     matches_table = Table(
-        title="⚔️ Confrontos Realizados Nesta Rodada",
+        title=f"⚔️ Confrontos Realizados Nesta Rodada (v{__version__})",
         border_style="cyan",
         header_style="bold bright_cyan",
     )
     matches_table.add_column("Partida", justify="center", width=8)
+    matches_table.add_column("Versão", justify="center", width=8)
     matches_table.add_column("Brancas", justify="left")
     matches_table.add_column("Pretas", justify="left")
     matches_table.add_column("Resultado", justify="left")
@@ -161,6 +163,7 @@ def print_round_summary(
         winner_color = "green" if r.get("outcome") in ("white", "black") else "yellow"
         matches_table.add_row(
             f"#{idx}",
+            f"v{r.get('app_version', __version__)}",
             r.get("white", ""),
             r.get("black", ""),
             f"[{winner_color}]{r.get('result_desc', '')}[/{winner_color}]",

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from .corpus import CorpusManager
 from .game import ChessGame
+from . import __version__
 
 
 class SessionManager:
@@ -29,6 +30,7 @@ class SessionManager:
         """Persist game state to disk."""
         data = {
             "game_id": game.game_id,
+            "app_version": __version__,
             "created_at": game.created_at,
             "fen": game.board.fen(),
             "turn": "white" if game.board.turn else "black",
