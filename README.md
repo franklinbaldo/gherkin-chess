@@ -38,14 +38,14 @@ Move executed on board
 
 ---
 
-## 🧠 Operational Memory: Dual READ/WRITE Loop
+## 🧠 Operational Memory: Dual READ/WRITE Loop & Historical Consistency
 
-The Gherkin corpus is not merely an audit log written after the game; it is an **operational working memory**:
-
-1. **WRITE:** Every move produces knowledge materialized into the OKF bundle:
-   $$\text{Pre-Move Position} + \text{Decision} \longrightarrow \text{Gherkin} \longrightarrow \text{okf-parser} \longrightarrow \text{OKF Concept}$$
-2. **READ:** Before choosing a move, the MCP inspects the current board and queries the persistent OKF bundle:
-   $$\text{Current Board (FEN)} \longrightarrow \text{Contextual Retrieval} \longrightarrow \text{Relevant Scenarios} \longrightarrow \text{Agent Insights}$$
+The Gherkin corpus is an **operational working memory** governed by the **Non-Silent Substitution Invariant**:
+- Conhecimento anterior relevante **nunca pode ser substituído silenciosamente**.
+- Diante de um lance com cenário anterior aplicável, o agente deve escolher formalmente entre:
+  1. **Reutilizar (`reuse`):** Confirma a regra existente sem duplicar arquivos no OKF.
+  2. **Divergir (`divergence`):** Explica explicitamente por que a regra anterior não se aplica àquele contexto e materializa uma nova regra com tags de linhagem (`@diverges_from`, `@divergence_reason`, `@relation:refines`).
+  3. **Criar (`new`):** Quando se trata de um padrão inédito.
 
 ---
 
@@ -65,8 +65,6 @@ Feature: Opening Principles
 - **Origin Position ($P_{\text{origin}}$):** The exact FEN right before the move was played. Immutable once created.
 - **Application Position ($P_{\text{app}}$):** Any subsequent board in this or future games where the scenario is retrieved as an insight.
 
-The MCP rigorously enforces that the claimed `origin_fen` matches the actual board state.
-
 ---
 
 ## 🏗 Gherkin & OKF: Structural Fidelity Without Domain Coupling
@@ -79,46 +77,43 @@ The OKF metamodel does **not** contain chess concepts (`ChessMove`, `Tactic`, `P
 - `Step` (`Given`, `When`, `Then`, `And`, `But`)
 - `Examples` / `DataTable` / `DocString`
 
-Domain semantics belong to the text inside the steps and tags, while `okf-parser` handles parsing, identity, and relational storage.
-
 ---
 
-## 🚀 Installation & Setup
+## 🚀 Setup & Dependency Management with `uv`
+
+The repository is fully configured to use [`uv`](https://docs.astral.sh/uv/) for reproducible dependency resolution, lockfile management, and rapid execution.
 
 ### Requirements
 - Python `>= 3.12`
-- `uv` (recommended) or standard `pip`
-- (Optional) `stockfish` executable on PATH for deep engine analysis
+- `uv` installed (`curl -LsSf https://astral.sh/uv/install.sh` or `winget install astral-sh.uv`)
 
+### Installation
+Clone the repository and sync the locked environment:
 ```bash
 git clone https://github.com/franklinbaldo/gherkin-chess.git
 cd gherkin-chess
 
-# Create virtual environment and install dependencies
-uv venv
-source .venv/bin/activate  # Or on Windows: .\.venv\Scripts\activate
-uv pip install -e ".[dev]"
+# Sync environment with dev dependencies using uv
+uv sync --extra dev
 ```
 
 ---
 
-## 🎮 Running the System
+## 🎮 Running with `uv run`
 
 ### 1. MCP Server (for AI Agents)
 Start the FastMCP server over stdio:
 ```bash
-python -m gherkin_chess.cli mcp
+uv run python -m gherkin_chess.cli mcp
 ```
 
-#### MCP Client Configuration
-To connect `gherkin-chess` to Claude Desktop, Gemini CLI, or any MCP client, add to your `mcpServers` config:
+#### MCP Client Configuration (e.g. Claude Desktop, Gemini CLI)
 ```json
 {
   "mcpServers": {
     "gherkin-chess": {
-      "command": "python",
-      "args": ["-m", "gherkin_chess.cli", "mcp"],
-      "cwd": "/path/to/gherkin-chess",
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/gherkin-chess", "python", "-m", "gherkin_chess.cli", "mcp"],
       "env": {
         "GHERKIN_CHESS_DATA_DIR": ".gherkin_chess_data"
       }
@@ -130,44 +125,34 @@ To connect `gherkin-chess` to Claude Desktop, Gemini CLI, or any MCP client, add
 ### 2. Available MCP Tools
 - `start_game(game_id, starting_fen)`: Start or reset a game.
 - `get_game_state(game_id)`: Inspect FEN, turn, legal moves (SAN and UCI).
-- `get_relevant_memory(game_id, limit)`: **[READ]** Retrieve top relevant past Scenarios.
+- `get_relevant_memory(game_id, candidate_move, limit)`: **[READ]** Retrieve top relevant past Scenarios.
 - `get_engine_advice(game_id, time_limit_secs)`: Get Stockfish / tactical engine recommendation.
-- `play_move(move, gherkin, game_id, explicit_origin_fen)`: **[WRITE]** Execute move through the Gherkin gate.
+- `play_move(move, gherkin, reuse_scenario_name, ...)`: **[WRITE]** Execute move through the Gherkin gate.
+- `get_corpus_metrics()`: Inspect epistemic stats (new vs reused vs diverged).
 - `list_corpus_knowledge(limit)`: Inspect stored OKF features.
 
 ### 3. Observer Web UI (Human Viewer)
-To observe ongoing games, board state, move history, latest Gherkin, and recovered operational memory in real-time:
 ```bash
-python -m gherkin_chess.cli web --port 8000
+uv run python -m gherkin_chess.cli web --port 8000
 ```
 Open [http://localhost:8000](http://localhost:8000) in your browser.
 
 ---
 
-## 🧪 Running Tests & Verification
+## 🧪 Testing & Verification with `uv`
 
-The test suite covers parser roundtripping, real `okf-parser` bundle loading, gate enforcement, and adversarial rejection attacks:
-
+Run all 18 unit, adversarial, and historical consistency tests:
 ```bash
-pytest -v
+uv run pytest -v
 ```
-
-### Adversarial Tests Verified:
-- Attempting to move without Gherkin (`MissingGherkinError`).
-- Attempting to move with invalid Gherkin syntax (`GherkinParseError`).
-- Attempting to move with unrelated Gherkin (`MoveNotRelatedError`).
-- Attempting to spoof `origin_fen` (`OriginMismatchError`).
-- Attempting to bypass the Gherkin gate using Stockfish recommendations directly.
-- Immutability of past origin FENs.
 
 ---
 
-## 🎬 End-to-End Demonstration Script
+## 🎬 End-to-End Demonstration
 
-To run the complete demonstration of a two-game sequence showing cross-game operational memory reuse:
-
+Run the demonstration script showcasing knowledge creation, reuse, divergence, and metrics:
 ```bash
-python demo_run.py
+uv run python demo_run.py
 ```
 
 ---
