@@ -71,6 +71,8 @@ def play(
 
     import random
 
+    round_results = []
+
     if live:
         with Live(console=console, screen=True, auto_refresh=False) as live_display:
             def update_ui(current_game_id: str, status: str):
@@ -103,20 +105,113 @@ def play(
                 def on_ply_event(info: dict):
                     update_ui(info["game_id"], f"Partida {i+1}/{matches} | Lance #{info['plies_played']} | Vez de {info['game'].board.turn and 'Brancas' or 'Pretas'}")
 
-                play_tournament_match(
+                res = play_tournament_match(
                     p1, p2,
                     session=session,
                     leaderboard=leaderboard,
                     max_plies=max_plies,
                     on_ply=on_ply_event,
                 )
-                update_ui(game_id, f"Partida {i+1}/{matches} concluída!")
+                round_results.append(res)
+                update_ui(game_id, f"Partida {i+1}/{matches} concluída: {res['result_desc']}")
+                time.sleep(1.0)
     else:
         for i in range(matches):
             p1, p2 = random.sample(DEFAULT_MODEL_ROSTER, 2)
             console.print(f"[bold cyan]Partida {i+1}/{matches}:[/bold cyan] {p1['name']} vs {p2['name']}...")
             res = play_tournament_match(p1, p2, session=session, leaderboard=leaderboard, max_plies=max_plies)
+            round_results.append(res)
             console.print(f" -> [green]{res['result_desc']}[/green] ({res['plies']} plies em {res['duration_s']}s)")
+
+    # ── RELATÓRIO OFICIAL DE STATS DA RODADA ──
+    print_round_summary(console, round_results, session, leaderboard)
+
+
+def print_round_summary(
+    console: Console,
+    round_results: List[Dict[str, Any]],
+    session: SessionManager,
+    leaderboard: LeaderboardManager,
+):
+    """Render comprehensive stats report of the completed tournament round."""
+    console.print("\n")
+    console.print(Panel(
+        f"[bold bright_green]✔ RODADA FINALIZADA COM SUCESSO![/bold bright_green]\n"
+        f"Partidas disputadas: [bold cyan]{len(round_results)}[/bold cyan] | "
+        f"Tempo total de jogo: [bold yellow]{sum(r.get('duration_s', 0) for r in round_results):.1f}s[/bold yellow] | "
+        f"Lances totais: [bold magenta]{sum(r.get('plies', 0) for r in round_results)}[/bold magenta]",
+        title="[bold yellow]📊 ESTATÍSTICAS DA RODADA (GHERKIN-CHESS)[/bold yellow]",
+        border_style="bright_yellow",
+    ))
+
+    # 1. Tabela de Confrontos da Rodada
+    matches_table = Table(
+        title="⚔️ Confrontos Realizados Nesta Rodada",
+        border_style="cyan",
+        header_style="bold bright_cyan",
+    )
+    matches_table.add_column("Partida", justify="center", width=8)
+    matches_table.add_column("Brancas", justify="left")
+    matches_table.add_column("Pretas", justify="left")
+    matches_table.add_column("Resultado", justify="left")
+    matches_table.add_column("Lances", justify="center", width=8)
+    matches_table.add_column("Duração", justify="right", width=10)
+
+    for idx, r in enumerate(round_results, 1):
+        winner_color = "green" if r.get("outcome") in ("white", "black") else "yellow"
+        matches_table.add_row(
+            f"#{idx}",
+            r.get("white", ""),
+            r.get("black", ""),
+            f"[{winner_color}]{r.get('result_desc', '')}[/{winner_color}]",
+            str(r.get("plies", 0)),
+            f"{r.get('duration_s', 0):.1f}s",
+        )
+    console.print(matches_table)
+
+    # 2. Métricas Epistêmicas do Corpus OKF
+    metrics = session.corpus.get_application_metrics()
+    features = session.corpus.load_all_features()
+    console.print(Panel(
+        f"• [cyan]Total de Features materializadas no Corpus:[/cyan] [bold]{len(features)}[/bold]\n"
+        f"• [green]Cenários Reutilizados (Knowledge Reuse):[/green] [bold]{metrics.get('reused_count', 0)}[/bold]\n"
+        f"• [blue]Novos Cenários Validados (New Rules):[/blue] [bold]{metrics.get('new_knowledge_count', 0)}[/bold]\n"
+        f"• [yellow]Divergências Fundamentadas (Refinements):[/yellow] [bold]{metrics.get('divergence_count', 0)}[/bold]",
+        title="[bold magenta]🧠 Métricas Epistêmicas (Corpus OKF)[/bold magenta]",
+        border_style="magenta",
+    ))
+
+    # 3. Placar Geral Atualizado OpenSkill
+    leaderboard._load()
+    standings = leaderboard.get_standings()
+
+    ladder_table = Table(
+        title="🏆 Placar Oficial Atualizado OpenSkill (Plackett-Luce Ladder)",
+        border_style="bright_green",
+        header_style="bold green",
+    )
+    ladder_table.add_column("Rank", justify="center", width=6)
+    ladder_table.add_column("Agente / Modelo", justify="left")
+    ladder_table.add_column("Rating Ordinal (μ - 3σ)", justify="right")
+    ladder_table.add_column("μ (Habilidade)", justify="right")
+    ladder_table.add_column("σ (Incerteza)", justify="right")
+    ladder_table.add_column("Partidas", justify="center")
+    ladder_table.add_column("V-E-D", justify="center")
+    ladder_table.add_column("Aproveitamento", justify="right")
+
+    for s in standings:
+        ladder_table.add_row(
+            str(s["rank"]),
+            s["name"],
+            f"[bold yellow]{s['ordinal']:.2f}[/bold yellow]",
+            f"{s['mu']:.2f}",
+            f"{s['sigma']:.2f}",
+            str(s["matches"]),
+            f"{s['wins']}-{s['draws']}-{s['losses']}",
+            f"{s['win_rate']}%",
+        )
+    console.print(ladder_table)
+
 
 
 @app.command(name="leaderboard")
