@@ -34,8 +34,14 @@ def get_relevant_memory(
     limit: int = 5,
 ) -> List[Dict[str, Any]]:
     """
-    [READ FLOW] Retrieve relevant past Gherkin Scenarios from OKF corpus
-    matched against the current board state and candidate move.
+    [READ FLOW] Retrieve relevant past Gherkin Scenarios from the OKF corpus
+    based primarily on the current board state (FEN, phase, material, tactical traits).
+    
+    Arguments:
+    - game_id: Identifier of the active game session. Defaults to 'game_default'.
+    - candidate_move: (OPTIONAL) A specific move under consideration (e.g. 'e4', 'Nf3').
+      If omitted, memory is retrieved purely by positional and structural similarity.
+    - limit: Maximum number of relevant scenarios to return. Defaults to 5.
     """
     game = session_manager.get_game(game_id=game_id)
     return game.get_memory_insights(candidate_move=candidate_move, limit=limit)
