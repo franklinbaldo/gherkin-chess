@@ -4,7 +4,7 @@ import os
 import random
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 import chess
 
 from .engine_advisor import EngineAdvisor
@@ -78,6 +78,7 @@ def play_tournament_match(
     session: SessionManager,
     leaderboard: LeaderboardManager,
     max_plies: int = 40,
+    on_ply: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Dict[str, Any]:
     """Play a single competitive match between two agents and update OpenSkill ladder."""
     game_id = f"match_{int(time.time())}_{random.randint(100, 999)}"
@@ -156,8 +157,22 @@ def play_tournament_match(
             game.board.push(move_obj)
 
         plies_played += 1
+        session.save_game(game)
+
+        if on_ply is not None:
+            try:
+                on_ply({
+                    "game_id": game_id,
+                    "plies_played": plies_played,
+                    "white": agent_white.name,
+                    "black": agent_black.name,
+                    "game": game,
+                })
+            except Exception:
+                pass
 
     duration = time.time() - t0
+    session.save_game(game)
 
     # Determine outcome
     if game.board.is_checkmate():

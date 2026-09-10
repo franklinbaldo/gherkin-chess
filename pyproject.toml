@@ -14,6 +14,7 @@ dependencies = [
     "httpx>=0.28.1",
     "openskill>=6.2.0",
     "litellm>=1.100.1",
+    "cyclopts>=4.0.0",
 ]
 
 [project.optional-dependencies]
