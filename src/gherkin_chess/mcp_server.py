@@ -102,6 +102,24 @@ def play_move(
 
 
 @mcp.tool()
+def play_direct_move(
+    move: str,
+    game_id: str = "game_default",
+) -> Dict[str, Any]:
+    """
+    [WRITE FLOW - STANDARD / RAW AGENT] Execute a move on the board through MCP
+    WITHOUT requiring Gherkin or OKF materialization.
+    
+    Arguments:
+    - move: UCI or SAN string of the legal move (e.g., 'e4', 'e2e4', 'Nf3').
+    - game_id: Identifier of the active game session. Defaults to 'game_default'.
+    """
+    game = session_manager.get_game(game_id=game_id)
+    return game.execute_direct_move(move_str=move)
+
+
+
+@mcp.tool()
 def get_corpus_metrics() -> Dict[str, Any]:
     """
     Inspect epistemic metrics: total applications, reuse count, divergence count,

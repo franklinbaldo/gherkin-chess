@@ -113,6 +113,59 @@ class ChessGame:
         """Get tactical advice from Stockfish or fallback heuristic."""
         return self.advisor.analyze_position(self.board, time_limit_secs=time_limit_secs)
 
+    def execute_direct_move(self, move_str: str) -> Dict[str, Any]:
+        """
+        Execute a legal move directly without requiring Gherkin or OKF materialization.
+        Used by the standard/raw agent variant playing through MCP.
+        """
+        try:
+            try:
+                move = chess.Move.from_uci(move_str)
+                if move not in self.board.legal_moves:
+                    move = self.board.parse_san(move_str)
+            except ValueError:
+                move = self.board.parse_san(move_str)
+        except Exception as exc:
+            raise IllegalMoveError(f"Move '{move_str}' is illegal or invalid: {exc}") from exc
+
+        if move not in self.board.legal_moves:
+            raise IllegalMoveError(f"Move '{move_str}' ({move.uci()}) is not legal in current position.")
+
+        pre_fen = self.board.fen()
+        san = self.board.san(move)
+        uci = move.uci()
+
+        self.board.push(move)
+        post_fen = self.board.fen()
+
+        record = MoveRecord(
+            move_number=len(self.history) + 1,
+            turn="white" if self.board.turn == chess.BLACK else "black",
+            uci=uci,
+            san=san,
+            pre_fen=pre_fen,
+            post_fen=post_fen,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            gherkin="",
+            epistemic_mode="direct_mcp",
+            applied_scenario=None,
+            origin_fen=None,
+            diverged_from=None,
+            divergence_reason=None,
+            recovered_scenarios=[],
+        )
+        self.history.append(record)
+
+        return {
+            "status": "success",
+            "move_uci": uci,
+            "move_san": san,
+            "pre_fen": pre_fen,
+            "post_fen": post_fen,
+            "epistemic_mode": "direct_mcp",
+            "is_game_over": self.board.is_game_over(),
+        }
+
     def execute_move(
         self,
         move_str: str,

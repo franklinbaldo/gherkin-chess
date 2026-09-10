@@ -53,15 +53,15 @@ def get_tournament_roster() -> List[Dict[str, Any]]:
     # Configure both MCP and Raw variants for available free models
     for m in available[:6]:
         short_name = m.split("/")[-1].replace(":free", "")
-        # Variant with MCP (OKF memory + Gherkin-to-action gate)
+        # Variant 1: MCP com Gate Obrigatório de Gherkin + OKF
         roster.append({
-            "name": f"{short_name} (MCP)",
+            "name": f"{short_name} (MCP-Gherkin)",
             "model": f"openrouter/{m}",
             "with_mcp": True,
         })
-        # Variant without MCP (Raw direct move generator)
+        # Variant 2: MCP Direto (Estado + Stockfish via MCP, sem obrigatoriedade de Gherkin)
         roster.append({
-            "name": f"{short_name} (Raw)",
+            "name": f"{short_name} (MCP-Direct)",
             "model": f"openrouter/{m}",
             "with_mcp": False,
         })
@@ -152,9 +152,10 @@ def play_tournament_match(
                 res = game.execute_move(move_candidate, gherkin_text=safe_gherkin)
                 mcp_events.append(res)
         else:
-            # ── AGENTE SEM MCP (APENAS MOVIMENTO DIRETO) ──
-            move_obj = game.board.parse_san(move_candidate)
-            game.board.push(move_obj)
+            # ── AGENTE VIA MCP SEM GATE GHERKIN (MCP play_direct_move) ──
+            # Usa o MCP para jogar seu movimento diretamente sem obrigatoriedade de Gherkin
+            res = game.execute_direct_move(move_candidate)
+            mcp_events.append(res)
 
         plies_played += 1
         session.save_game(game)

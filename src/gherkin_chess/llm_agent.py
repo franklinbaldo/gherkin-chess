@@ -43,13 +43,22 @@ class LLMChessAgent:
         color = "White" if board.turn else "Black"
 
         if not self.with_mcp:
-            # ── AGENTE SEM MCP (APENAS MOVIMENTO) ──
-            prompt = f"""You are playing chess as {color}.
-Current FEN: {curr_fen}
-Legal moves: {', '.join(legal_moves_san)}
+            # ── AGENTE VIA MCP SEM GATE GHERKIN (Standard Direct MCP) ──
+            # Usa as ferramentas MCP do jogo (estado, engine advice), mas não é obrigado a formular Gherkin
+            advice = game.get_engine_advice(time_limit_secs=0.05)
+            engine_hint = f"Engine Best Move: {advice.get('best_move')} (Score: {advice.get('evaluation_cp', 0)/100:.2f})" if advice.get("best_move") else ""
+
+            prompt = f"""You are playing chess as {color} connected to the GherkinChess MCP server.
+You have called MCP tools:
+- get_game_state(): FEN = {curr_fen}
+- get_engine_advice(): {engine_hint}
+- Legal moves: {', '.join(legal_moves_san)}
+
+You are executing a move via the MCP tool 'play_direct_move' (Gherkin is NOT mandatory for you).
+You may follow or diverge from the engine recommendation based on your own chess evaluation.
 
 Choose your move. Respond ONLY in valid JSON with format:
-{{"move": "<move_in_san_or_uci>", "thought": "<short_reasoning>"}}
+{{"move": "<move_in_san_or_uci>", "thought": "<tactical_reasoning_and_engine_comparison>"}}
 """
             response = self._call_llm(prompt)
             data = self._parse_json(response)

@@ -145,8 +145,8 @@ def build_dashboard_layout(
         telemetry_table.add_row("Gherkin Gate:", f"[italic bright_cyan]{' -> '.join(gh_lines)}[/italic bright_cyan]")
     else:
         telemetry_table.add_row("Status:", "[yellow]Aguardando execução do primeiro lance...[/yellow]")
-        telemetry_table.add_row("Agente Brancas:", "DeepSeek-V3 / Gemma-4 (MCP)")
-        telemetry_table.add_row("Agente Pretas:", "Nemotron / LFM (Raw)")
+        telemetry_table.add_row("Agente Brancas:", "Gemma-4 / DeepSeek (MCP-Gherkin)")
+        telemetry_table.add_row("Agente Pretas:", "Nemotron / LFM (MCP-Direct)")
 
     if corpus_metrics:
         telemetry_table.add_row("Corpus OKF:", f"Tot: {corpus_metrics.get('total_applications', 0)} | Reúso: {corpus_metrics.get('reused_count', 0)} | Novos: {corpus_metrics.get('new_knowledge_count', 0)} | Divergências: {corpus_metrics.get('divergence_count', 0)}")
