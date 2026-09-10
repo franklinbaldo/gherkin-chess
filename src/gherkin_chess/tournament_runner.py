@@ -13,14 +13,63 @@ from .leaderboard import LeaderboardManager
 from .llm_agent import LLMChessAgent
 from .session import SessionManager
 
-# Model pool from OpenRouter open-weights / accessible models
-DEFAULT_MODEL_ROSTER = [
-    {"name": "Llama-3.3-70B (MCP)", "model": "openrouter/meta-llama/llama-3.3-70b-instruct", "with_mcp": True},
-    {"name": "DeepSeek-V3 (MCP)", "model": "openrouter/deepseek/deepseek-chat", "with_mcp": True},
-    {"name": "Qwen-2.5-72B (MCP)", "model": "openrouter/qwen/qwen-2.5-72b-instruct", "with_mcp": True},
-    {"name": "Llama-3.1-8B (Raw No-MCP)", "model": "openrouter/meta-llama/llama-3.1-8b-instruct", "with_mcp": False},
-    {"name": "Qwen-2.5-Coder (Raw No-MCP)", "model": "openrouter/qwen/qwen-2.5-coder-32b-instruct", "with_mcp": False},
+import urllib.request
+import json
+
+# Fallback free model pool on OpenRouter
+FALLBACK_FREE_MODELS = [
+    "google/gemma-4-26b-a4b-it:free",
+    "liquid/lfm-2.5-2.6b:free",
+    "openrouter/free",
+    "cohere/north-mini-code:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
 ]
+
+def fetch_openrouter_free_models() -> List[str]:
+    """Fetch active free models dynamically from OpenRouter models API."""
+    try:
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/models",
+            headers={"User-Agent": "gherkin-chess/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        free_ids = [
+            m["id"] for m in data.get("data", [])
+            if m.get("id", "").endswith(":free") or (
+                m.get("pricing", {}).get("prompt") == "0" and m.get("pricing", {}).get("completion") == "0"
+            )
+        ]
+        if free_ids:
+            return free_ids
+    except Exception as exc:
+        print(f"[Warning] Failed to fetch live OpenRouter models: {exc}. Using fallback free models.")
+    return FALLBACK_FREE_MODELS
+
+def get_tournament_roster() -> List[Dict[str, Any]]:
+    """Build a balanced tournament roster using only OpenRouter free models."""
+    available = fetch_openrouter_free_models()
+    roster = []
+    # Configure both MCP and Raw variants for available free models
+    for m in available[:6]:
+        short_name = m.split("/")[-1].replace(":free", "")
+        # Variant with MCP (OKF memory + Gherkin-to-action gate)
+        roster.append({
+            "name": f"{short_name} (MCP)",
+            "model": f"openrouter/{m}",
+            "with_mcp": True,
+        })
+        # Variant without MCP (Raw direct move generator)
+        roster.append({
+            "name": f"{short_name} (Raw)",
+            "model": f"openrouter/{m}",
+            "with_mcp": False,
+        })
+    return roster
+
+# Default roster of free models
+DEFAULT_MODEL_ROSTER = get_tournament_roster()
+
 
 
 def play_tournament_match(
