@@ -1,6 +1,6 @@
 [project]
 name = "gherkin-chess"
-version = "0.1.0"
+version = "0.1.1"
 description = "A chess environment for AI agents where moves must be externalized as Gherkin and materialized via OKF"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,6 +15,7 @@ dependencies = [
     "openskill>=6.2.0",
     "litellm>=1.100.1",
     "cyclopts>=4.0.0",
+    "semver>=3.0.0",
 ]
 
 [project.optional-dependencies]

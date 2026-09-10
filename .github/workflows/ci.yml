@@ -1,0 +1,41 @@
+name: CI & SemVer Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Stockfish engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y stockfish
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run Pytest Test Suite
+        run: uv run pytest -v tests/
+
+      - name: Enforce SemVer Bump
+        if: github.event_name == 'pull_request'
+        run: |
+          uv run gherkin-chess check-version

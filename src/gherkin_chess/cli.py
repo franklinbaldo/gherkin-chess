@@ -290,6 +290,49 @@ def show_corpus(
     console.print(table)
 
 
+@app.command(name="bump")
+def bump(
+    part: Annotated[str, cyclopts.Parameter(help="Semver part to bump: patch, minor, or major")] = "patch"
+):
+    """Realiza bump semver (patch | minor | major) no pyproject.toml e __init__.py."""
+    from gherkin_chess.version_manager import bump_version
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    old_v, new_v = bump_version(repo_root, part=part)
+    console = Console()
+    console.print(Panel(
+        f"[bold green]✔ Versão Semver atualizada com sucesso![/bold green]\n"
+        f"Versão anterior: [yellow]v{old_v}[/yellow] ➔ Nova versão: [bold green]v{new_v}[/bold green]\n"
+        f"Tipo de bump: [cyan]{part}[/cyan]",
+        title="[bold cyan]📦 SemVer Version Bump[/bold cyan]",
+        border_style="cyan"
+    ))
+
+
+@app.command(name="check-version")
+def check_version():
+    """Verifica se a versão semver atual é estritamente superior ao commit anterior (HEAD)."""
+    from gherkin_chess.version_manager import verify_bump_since_head
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    is_valid, curr, head = verify_bump_since_head(repo_root)
+    console = Console()
+
+    if not is_valid:
+        console.print(Panel(
+            f"[bold red]❌ COMMIT BLOQUEADO: Bump de Versão Semver Obrigatório![/bold red]\n\n"
+            f"• Versão no HEAD: [yellow]v{head}[/yellow]\n"
+            f"• Versão atual:   [red]v{curr}[/red]\n\n"
+            f"É exigido um bump semver antes de realizar o commit!\n"
+            f"Execute um dos comandos abaixo e adicione os arquivos ao commit:\n"
+            f"  [bold green]uv run gherkin-chess bump --part patch[/bold green]  (ou minor / major)\n"
+            f"  [bold cyan]git add pyproject.toml src/gherkin_chess/__init__.py[/bold cyan]",
+            title="[bold red]🚫 SemVer Enforcement Gate[/bold red]",
+            border_style="red"
+        ))
+        sys.exit(1)
+    else:
+        console.print(f"[bold green]✔ Validação Semver OK:[/bold green] v{curr} > v{head}")
+
+
 @app.command(name="mcp")
 def run_mcp():
     """Executa o servidor FastMCP (stdio) para conexão com clientes MCP."""

@@ -44,9 +44,9 @@ jobs:
         run: |
           uv run python -c "from gherkin_chess.tournament_runner import run_scheduled_batch; run_scheduled_batch(num_matches=${{ github.event.inputs.matches || 2 }})"
 
-      - name: Commit and push updated Leaderboard and Corpus
+      - name: Commit and push updated Leaderboard and Corpus with SemVer Bump
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update OpenSkill leaderboard and OKF corpus [skip ci]" && git pull --rebase origin main && git push origin main)
+          git diff --quiet && git diff --staged --quiet || (uv run gherkin-chess bump --part patch && git add pyproject.toml src/gherkin_chess/__init__.py data/ && git commit -m "chore(release): bump version and update OpenSkill leaderboard [skip ci]" && git pull --rebase origin main && git push origin main)
