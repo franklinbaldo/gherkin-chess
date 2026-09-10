@@ -75,23 +75,30 @@ Choose your move. Respond ONLY in valid JSON with format:
                     memory_context += f"{i}. Scenario: '{item['scenario_name']}' (Score: {item['score']})\n"
                     memory_context += f"   Gherkin:\n{item['gherkin']}\n\n"
 
-            prompt = f"""You are an intelligent chess agent playing as {color} operating under the Gherkin-Chess MCP protocol.
+            prompt = f"""You are an intelligent chess agent playing as {color} operating under the strict Gherkin-Chess MCP protocol.
 Current FEN: {curr_fen}
 Legal moves: {', '.join(legal_moves_san)}
 
 {memory_context}
-RULES:
-1. You can choose to REUSE an existing Scenario if it matches your strategy (specify 'reuse_scenario_name').
-2. Otherwise, you must formulate a valid Gherkin Feature and Scenario justifying your chosen move (specify 'gherkin').
-3. The move MUST be legal and explicitly mentioned in your Gherkin step (e.g. When {color.lower()} plays <move>).
+MANDATORY PROTOCOL RULES:
+1. REUSE: If a Scenario from memory matches your plan, set "reuse_scenario_name": "<scenario_name>" and "gherkin": null.
+2. DIVERGENCE: If you disagree with a past scenario, set "diverges_from": "<scenario_name>", explain in "divergence_reason", and formulate a new "gherkin".
+3. NEW FEATURE: If creating new knowledge, you MUST formulate a complete Gherkin Feature & Scenario.
+   NEVER leave "gherkin" null or empty if not reusing! The move MUST be explicitly mentioned in the 'When' step!
+   Example of required Gherkin:
+   Feature: Tactical Expansion
+     Scenario: Advance {legal_moves_san[0]} to contest position
+       Given board state at move {game.board.fullmove_number}
+       When {color.lower()} plays {legal_moves_san[0]}
+       Then control key squares and advance development
 
-Respond ONLY in valid JSON with format:
+Respond ONLY in valid JSON:
 {{
   "move": "<chosen_legal_move>",
-  "reuse_scenario_name": "<name_or_null>",
-  "gherkin": "<valid_gherkin_text_or_null>",
-  "diverges_from": "<scenario_name_or_null>",
-  "divergence_reason": "<explanation_if_diverging_or_null>"
+  "reuse_scenario_name": null,
+  "gherkin": "Feature: ...\\n  Scenario: ...\\n    Given ...\\n    When {color.lower()} plays <chosen_legal_move>\\n    Then ...",
+  "diverges_from": null,
+  "divergence_reason": null
 }}
 """
             response = self._call_llm(prompt)

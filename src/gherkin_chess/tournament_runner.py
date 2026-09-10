@@ -99,6 +99,8 @@ def play_tournament_match(
     t0 = time.time()
     mcp_events = []
     plies_played = 0
+    outcome: Optional[str] = None
+    result_desc: str = ""
 
     while not game.board.is_game_over() and plies_played < max_plies:
         current_agent = agent_white if game.board.turn == chess.WHITE else agent_black
@@ -120,19 +122,14 @@ def play_tournament_match(
                 move_candidate = legal_sans[0]
 
         if current_agent.with_mcp:
-            # ── PASSAGEM OBRIGATÓRIA PELO GATE DO MCP ──
+            # ── PASSAGEM OBRIGATÓRIA PELO GATE DO MCP (SEM FALLBACK) ──
+            # O agente TEM que prover Gherkin válido ou declarar reuse/divergence.
+            # Não existe fallback canônico sintético!
             reuse_sc = decision.get("reuse_scenario_name")
             gherkin_text = decision.get("gherkin")
             diverges_from = decision.get("diverges_from")
             divergence_reason = decision.get("divergence_reason")
 
-            if not reuse_sc and not gherkin_text:
-                gherkin_text = f"""Feature: Tournament Execution
-  Scenario: Move {move_candidate} at Move {game.board.fullmove_number}
-    Given position at move {game.board.fullmove_number}
-    When {('white' if game.board.turn else 'black')} plays {move_candidate}
-    Then fight for central space and piece coordination
-"""
             try:
                 res = game.execute_move(
                     move_str=move_candidate,
@@ -140,20 +137,16 @@ def play_tournament_match(
                     reuse_scenario_name=reuse_sc,
                     diverges_from=diverges_from,
                     divergence_reason=divergence_reason,
+                    enforce_non_silent_substitution=True,
                 )
                 mcp_events.append(res)
-            except Exception:
-                safe_gherkin = f"""Feature: Recovery
-  Scenario: Safe Move {move_candidate}
-    Given board at move {game.board.fullmove_number}
-    When play {move_candidate}
-    Then legal move
-"""
-                res = game.execute_move(move_candidate, gherkin_text=safe_gherkin)
-                mcp_events.append(res)
+            except Exception as gate_err:
+                # VIOLAÇÃO DO GATE EPISTÊMICO: Derrota por desqualificação imediata
+                outcome = "black" if (game.board.turn == chess.WHITE) else "white"
+                result_desc = f"Desqualificação ({current_agent.name} violou o Gate Gherkin: {gate_err})"
+                break
         else:
             # ── AGENTE VIA MCP SEM GATE GHERKIN (MCP play_direct_move) ──
-            # Usa o MCP para jogar seu movimento diretamente sem obrigatoriedade de Gherkin
             res = game.execute_direct_move(move_candidate)
             mcp_events.append(res)
 
@@ -175,26 +168,27 @@ def play_tournament_match(
     duration = time.time() - t0
     session.save_game(game)
 
-    # Determine outcome
-    if game.board.is_checkmate():
-        outcome = "white" if (game.board.turn == chess.BLACK) else "black"
-        result_desc = f"Xeque-mate (Venceu {'Brancas' if outcome == 'white' else 'Pretas'})"
-    elif game.board.is_stalemate() or game.board.is_insufficient_material() or game.board.can_claim_threefold_repetition():
-        outcome = "draw"
-        result_desc = "Empate de regras (Afogamento/Repetição)"
-    else:
-        # Positional evaluation
-        eval_adv = advisor.analyze_position(game.board, time_limit_secs=0.08)
-        cp = eval_adv["evaluation_cp"]
-        if cp > 150:
-            outcome = "white"
-            result_desc = f"Vantagem Posicional Brancas (+{cp/100:.1f})"
-        elif cp < -150:
-            outcome = "black"
-            result_desc = f"Vantagem Posicional Pretas ({cp/100:.1f})"
-        else:
+    # Determine outcome (if not already disqualified)
+    if not outcome:
+        if game.board.is_checkmate():
+            outcome = "white" if (game.board.turn == chess.BLACK) else "black"
+            result_desc = f"Xeque-mate (Venceu {'Brancas' if outcome == 'white' else 'Pretas'})"
+        elif game.board.is_stalemate() or game.board.is_insufficient_material() or game.board.can_claim_threefold_repetition():
             outcome = "draw"
-            result_desc = f"Empate Posicional ({cp/100:.1f})"
+            result_desc = "Empate de regras (Afogamento/Repetição)"
+        else:
+            # Positional evaluation
+            eval_adv = advisor.analyze_position(game.board, time_limit_secs=0.08)
+            cp = eval_adv["evaluation_cp"]
+            if cp > 150:
+                outcome = "white"
+                result_desc = f"Vantagem Posicional Brancas (+{cp/100:.1f})"
+            elif cp < -150:
+                outcome = "black"
+                result_desc = f"Vantagem Posicional Pretas ({cp/100:.1f})"
+            else:
+                outcome = "draw"
+                result_desc = f"Empate Posicional ({cp/100:.1f})"
 
     # Update OpenSkill Leaderboard
     leaderboard.record_match(
