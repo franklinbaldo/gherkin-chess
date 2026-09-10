@@ -1,0 +1,73 @@
+{
+  "last_updated": "2026-09-10T18:18:24.952505+00:00",
+  "players": [
+    {
+      "name": "nex-n2.5-pro (MCP-Direct)",
+      "model_id": "openrouter/nex-agi/nex-n2.5-pro:free",
+      "mu": 27.635389493140497,
+      "sigma": 8.06590141354368,
+      "matches": 1,
+      "wins": 1,
+      "draws": 0,
+      "losses": 0
+    },
+    {
+      "name": "ling-3.0-flash-vl (MCP-Gherkin)",
+      "model_id": "openrouter/inclusionai/ling-3.0-flash-vl:free",
+      "mu": 22.364610506859503,
+      "sigma": 8.06590141354368,
+      "matches": 1,
+      "wins": 0,
+      "draws": 0,
+      "losses": 1
+    },
+    {
+      "name": "nex-n2.5-mini (MCP-Gherkin)",
+      "model_id": "openrouter/nex-agi/nex-n2.5-mini:free",
+      "mu": 22.364610506859503,
+      "sigma": 8.06590141354368,
+      "matches": 1,
+      "wins": 0,
+      "draws": 0,
+      "losses": 1
+    },
+    {
+      "name": "ling-3.0-flash-fin (MCP-Direct)",
+      "model_id": "openrouter/inclusionai/ling-3.0-flash-fin:free",
+      "mu": 27.635389493140497,
+      "sigma": 8.06590141354368,
+      "matches": 1,
+      "wins": 1,
+      "draws": 0,
+      "losses": 0
+    }
+  ],
+  "matches": [
+    {
+      "game_id": "match_1789064244_766",
+      "timestamp": "2026-09-10T18:18:10.099087+00:00",
+      "white": "nex-n2.5-pro (MCP-Direct)",
+      "black": "ling-3.0-flash-vl (MCP-Gherkin)",
+      "outcome": "white",
+      "plies": 3,
+      "details": {
+        "result_desc": "Desqualifica\u00e7\u00e3o (ling-3.0-flash-vl (MCP-Gherkin) n\u00e3o corrigiu o erro do Gate Gherkin ap\u00f3s 3 tentativas: Move rejected: A relevant scenario 'Strike at the center with c5' already exists for this context. You must either reuse it via reuse_scenario_name='Strike at the center with c5', or explicitly declare diverges_from='Strike at the center with c5' and explain why via divergence_reason.)",
+        "duration_s": 45.2,
+        "app_version": "0.1.1"
+      }
+    },
+    {
+      "game_id": "match_1789064290_531",
+      "timestamp": "2026-09-10T18:18:24.952493+00:00",
+      "white": "nex-n2.5-mini (MCP-Gherkin)",
+      "black": "ling-3.0-flash-fin (MCP-Direct)",
+      "outcome": "black",
+      "plies": 2,
+      "details": {
+        "result_desc": "Desqualifica\u00e7\u00e3o (nex-n2.5-mini (MCP-Gherkin) n\u00e3o corrigiu o erro do Gate Gherkin ap\u00f3s 3 tentativas: Move rejected: Gherkin justification or reuse_scenario_name is mandatory.)",
+        "duration_s": 14.9,
+        "app_version": "0.1.1"
+      }
+    }
+  ]
+}

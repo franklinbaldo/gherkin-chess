@@ -1,6 +1,6 @@
 [project]
 name = "gherkin-chess"
-version = "0.1.1"
+version = "0.1.2"
 description = "A chess environment for AI agents where moves must be externalized as Gherkin and materialized via OKF"
 readme = "README.md"
 requires-python = ">=3.12"
