@@ -28,13 +28,17 @@ def get_game_state(game_id: str = "game_default") -> Dict[str, Any]:
 
 
 @mcp.tool()
-def get_relevant_memory(game_id: str = "game_default", limit: int = 5) -> List[Dict[str, Any]]:
+def get_relevant_memory(
+    game_id: str = "game_default",
+    candidate_move: Optional[str] = None,
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
     """
     [READ FLOW] Retrieve relevant past Gherkin Scenarios from OKF corpus
-    matched against the current board state and origin_fens.
+    matched against the current board state and candidate move.
     """
     game = session_manager.get_game(game_id=game_id)
-    return game.get_memory_insights(limit=limit)
+    return game.get_memory_insights(candidate_move=candidate_move, limit=limit)
 
 
 @mcp.tool()
@@ -51,27 +55,53 @@ def get_engine_advice(game_id: str = "game_default", time_limit_secs: float = 0.
 @mcp.tool()
 def play_move(
     move: str,
-    gherkin: str,
     game_id: str = "game_default",
+    gherkin: Optional[str] = None,
+    reuse_scenario_name: Optional[str] = None,
+    diverges_from: Optional[str] = None,
+    divergence_reason: Optional[str] = None,
     explicit_origin_fen: Optional[str] = None,
+    enforce_non_silent_substitution: bool = False,
 ) -> Dict[str, Any]:
     """
     [WRITE FLOW] Execute a move on the board through the mandatory Gherkin -> OKF gate.
     
+    Epistemic Choices:
+    1. REUSE: Provide `reuse_scenario_name` (e.g. 'Establish Central Pawn'). Reuses existing
+       knowledge without re-materializing duplicates.
+    2. DIVERGENCE: Provide new `gherkin` + `diverges_from` + `divergence_reason`. Explains why
+       a past scenario does not apply to this context and materializes a refined rule.
+    3. NEW KNOWLEDGE: Provide new `gherkin`.
+    
     Arguments:
     - move: UCI or SAN string of the legal move (e.g., 'e4', 'e2e4', 'Nf3').
     - gherkin: Gherkin feature/scenario explaining and referencing the move.
+    - reuse_scenario_name: Name of a past scenario to confirm/reuse.
+    - diverges_from: Name of past scenario that was considered but rejected/refined.
+    - divergence_reason: Explicit rationale for divergence.
     - explicit_origin_fen: Optional. Must match current board FEN if provided.
-    
-    The move is rejected if:
-    - Gherkin is missing or has invalid syntax.
-    - Gherkin has an origin_fen conflicting with pre-move board.
-    - Gherkin has no connection to the intended move.
-    - okf-parser fails to materialize the document.
-    - The move is illegal.
+    - enforce_non_silent_substitution: If True, rejects new Gherkin if a strong matching scenario
+      exists unless reuse or divergence is declared.
     """
     game = session_manager.get_game(game_id=game_id)
-    return game.execute_move(move_str=move, gherkin_text=gherkin, explicit_origin_fen=explicit_origin_fen)
+    return game.execute_move(
+        move_str=move,
+        gherkin_text=gherkin,
+        reuse_scenario_name=reuse_scenario_name,
+        diverges_from=diverges_from,
+        divergence_reason=divergence_reason,
+        explicit_origin_fen=explicit_origin_fen,
+        enforce_non_silent_substitution=enforce_non_silent_substitution,
+    )
+
+
+@mcp.tool()
+def get_corpus_metrics() -> Dict[str, Any]:
+    """
+    Inspect epistemic metrics: total applications, reuse count, divergence count,
+    and scenario usage frequency.
+    """
+    return session_manager.corpus.get_application_metrics()
 
 
 @mcp.tool()
