@@ -1,0 +1,52 @@
+name: Continuous OpenRouter Chess Tournament
+
+on:
+  schedule:
+    # Rodar a cada 15 minutos
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      matches:
+        description: 'Number of matches to play in this batch'
+        required: false
+        default: '2'
+
+jobs:
+  play-matches:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Stockfish engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y stockfish
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run Tournament Batch with OpenSkill
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GHERKIN_CHESS_DATA_DIR: data
+        run: |
+          uv run python -c "from gherkin_chess.tournament_runner import run_scheduled_batch; run_scheduled_batch(num_matches=${{ github.event.inputs.matches || 2 }})"
+
+      - name: Commit and push updated Leaderboard and Corpus
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update OpenSkill leaderboard and OKF corpus [skip ci]" && git push)
